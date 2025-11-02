@@ -48,12 +48,20 @@ static inline bool sclip_verify_config_attribute_value_type(const char *const va
 static inline void sclip_generate_options_enum_decl(const sclip_config *config, FILE *file);
 static inline void sclip_generate_options_declaration(const sclip_config *config, FILE *file);
 static inline void sclip_generator_header_guard(const sclip_config *config, FILE *file);
+static inline void sclip_generator_value_getters(const sclip_config *config, FILE *file);
+static inline void sclip_generator_presence_checkers(const sclip_config *config, FILE *file);
 
 static const sclip_scenario_item SCLIP_GENERATION_SCENARIO[] = {
     { .static_content = NULL, .generator = sclip_generator_header_guard },
     { .static_content =
+            "#ifdef __cplusplus\n"
+            "extern \"C\" {\n"
+            "#endif\n\n",
+        .generator = NULL },
+    { .static_content =
             "#include <stdbool.h>\n"
             "#include <string.h>\n"
+            "#include <limits.h>\n"
             "#include <stdlib.h>\n\n",
         .generator = NULL },
     { .static_content =
@@ -83,6 +91,17 @@ static const sclip_scenario_item SCLIP_GENERATION_SCENARIO[] = {
         .generator = NULL },
     { .static_content = NULL, .generator = sclip_generate_options_enum_decl },
     { .static_content = NULL, .generator = sclip_generate_options_declaration },
+    { .static_content =
+            "#define sclip_parse(argc, argv) \\\n"
+            "    __sclip_parse(argc, argv, &SCLIP_OPTIONS[0])\n"
+            "static inline bool __sclip_parse(int argc, const char **argv, const sclip_option * restrict options);\n\n",
+        .generator = NULL },
+    { .static_content = NULL, .generator = sclip_generator_presence_checkers },
+    { .static_content =
+            "#ifdef __cplusplus\n"
+            "} // extern \"C\"\n"
+            "#endif\n\n",
+        .generator = NULL },
 };
 
 #define sclip_generate(config, file) \
@@ -262,12 +281,12 @@ static inline void sclip_generate_options_enum_decl(const sclip_config *config, 
     static const size_t page_size = 512;
     static const char *sclip_options_enum_decl = "typedef enum {\n";
     saa_arena arena = saa_arena_create(page_size);
-
     fprintf(file, sclip_options_enum_decl);
     for (sclip_option *option = config->options; option != NULL; option = option->next) {
         fprintf(file, "    SCLIP_OPTION_%s_ID,\n", __sclip_to_upper(saa_arena_push_value_string(&arena, option->name)));
     }
     fprintf(file, "    SCLIP_OPTION_HELP_MENU_ID\n} sclip_option_id\n\n");
+    saa_arena_destroy(&arena);
 }
 
 static inline void sclip_generate_options_declaration(const sclip_config *config, FILE *file)
@@ -277,14 +296,26 @@ static inline void sclip_generate_options_declaration(const sclip_config *config
     saa_arena arena = saa_arena_create(page_size);
     fprintf(file, sclip_options_decl);
     for (sclip_option *option = config->options; option != NULL; option = option->next) {
-        fprintf(file, "    [SCLIP_OPTION_%s] = { ", __sclip_to_upper(saa_arena_push_value_string(&arena, option->name)));
+        fprintf(file, "    [SCLIP_OPTION_%s_ID] = { ", __sclip_to_upper(saa_arena_push_value_string(&arena, option->name)));
         fprintf(file, ".long_opt = %s, ", saa_arena_push_value_strings(&arena, "\"", option->long_opt, "\""));
         fprintf(file, ".short_opt = %s, ", saa_arena_push_value_strings(&arena, "\"", option->short_opt, "\""));
         fprintf(file, ".type = %s, ", __sclip_type_converter(option->value_type));
         fprintf(file, ".optional = %s, ", option->optional ? "true" : "false");
-        fprintf(file, ".value = { 0 } },\n");
+        fprintf(file, ".value = { .numeric = LONG_MIN } },\n");
     }
-    fprintf(file, "};\n");
+    fprintf(file, "};\n\n");
+    saa_arena_destroy(&arena);
+}
+
+static inline void sclip_generator_presence_checkers(const sclip_config *config, FILE *file)
+{
+    static const size_t page_size = 512;
+    saa_arena arena = saa_arena_create(page_size);
+    for (sclip_option *option = config->options; option != NULL; option = option->next) {
+        fprintf(file, "#define sclip_get_option_%s_value() \\\n", option->name);
+        fprintf(file, "    __sclip_get_option_%s_value(&SCLIP_OPTIONS[0], SCLIP_OPTION_%s_ID)\n", option->name, __sclip_to_upper(saa_arena_push_value_string(&arena, option->name)));
+        fprintf(file, "static inline %s __sclip_get_%s_value(const sclip_option * restrict options, const SCLIP_OPTION_HELP_MENU_ID id);\n\n", option->value_type, option->name);
+    }
     saa_arena_destroy(&arena);
 }
 
