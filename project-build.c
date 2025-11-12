@@ -1,5 +1,5 @@
 #define NOB_IMPLEMENTATION
-#include "nob.h"
+#include "build/deps/nob/nob.h"
 #include <dirent.h>
 #include <errno.h>
 
@@ -24,6 +24,7 @@ static inline bool dir_exists(const char *path)
 int main(int argc, char **argv)
 {
     NOB_GO_REBUILD_URSELF(argc, argv);
+    Nob_String_Builder builder;
     Nob_Cmd cmd = { 0 };
 
     nob_cmd_append(&cmd, "mkdir", "-p", "build/deps/stf");
@@ -54,7 +55,7 @@ int main(int argc, char **argv)
     }
     nob_cmd_append(&cmd, "cc", "-Wall", "-Wextra", "-Wpedantic", "-std=c11", "-ggdb", "-o", "build/sclip-tests", "-Iinclude", "-Ibuild/deps/cjson/instal/include", "-Ibuild/deps/", "-Lbuild/deps/cjson/instal/lib", "test/sclip-tests.c", "-l:libcjson.a");
     if (!nob_cmd_run(&cmd)) return 1;
-    // nob_cmd_append(&cmd, "cc", "-Wall", "-Wextra", "-Wpedantic", "-ggdb", "-o", "build/sclip", "-lpthread", "-lrt", "-Iinclude", "-Ibuild/deps/cjson/instal/include", "-Lbuild/deps/cjson/instal/lib", "src/sclip.c", "-l:libcjson.a");
+    // nob_cmd_append(&cmd, "cc", "-Wall", "-Wextra", "-Wpedantic", "-std=c11", "-ggdb", "-o", "build/sclip-build", "-Iinclude", "-Ibuild/deps/", "test/sclip-build.c");
     // if (!nob_cmd_run(&cmd)) return 1;
     return 0;
 }
