@@ -10,17 +10,27 @@ static const char *TEST_CONFIG =
     "    \"version\": \"1.0.1\","
     "    \"options\": ["
     "        {"
-    "            \"name\": \"option_a\","
-    "            \"value-type\": \"double\","
-    "            \"long-opt\": \"--option\","
-    "            \"short-opt\": \"-o\","
+    "            \"name\": \"path\","
+    "            \"value-type\": \"string\","
+    "            \"long-opt\": \"--path-long\","
+    "            \"short-opt\": \"\","
+    "            \"description\": \"this is asdasd some description about the option and what it does\","
     "            \"optional\": false"
     "        },"
     "        {"
-    "            \"name\": \"option_b\","
-    "            \"value-type\": \"long\","
-    "            \"long-opt\": \"--ass\","
+    "            \"name\": \"file\","
+    "            \"value-type\": \"string\","
+    "            \"long-opt\": \"\","
+    "            \"short-opt\": \"-f\","
+    "            \"description\": \"this is some description about the option and what it does\","
+    "            \"optional\": true"
+    "        },"
+    "        {"
+    "            \"name\": \"flag\","
+    "            \"value-type\": \"bool\","
+    "            \"long-opt\": \"--flag\","
     "            \"short-opt\": \"-a\","
+    "            \"description\": \"this is some description about the option and what it does\","
     "            \"optional\": true"
     "        }"
     "    ]"
@@ -31,12 +41,12 @@ STF_TEST_CASE(sclip, generate_options_list_from_config)
     cJSON *json_config = cJSON_Parse(TEST_CONFIG);
     STF_EXPECT(cJSON_GetObjectItem(json_config, "options") != NULL, .return_on_failure = true, .failure_msg = "json_configs options were not provided");
     STF_EXPECT(cJSON_IsArray(cJSON_GetObjectItem(json_config, "options")), .return_on_failure = true, .failure_msg = "json_configs options is not an array");
-    STF_EXPECT(cJSON_GetArraySize(cJSON_GetObjectItem(json_config, "options")) == 2, .return_on_failure = true, .failure_msg = "json_configs child is supposed to be a array");
+    STF_EXPECT(cJSON_GetArraySize(cJSON_GetObjectItem(json_config, "options")) == 3, .return_on_failure = true, .failure_msg = "json_configs child is supposed to be a array");
     sclip_config config = { 0 };
-    STF_EXPECT(sclip_parse_options(json_config, &config) == true, .failure_msg = "unable to parse to config");
+    STF_EXPECT(sclip_config_create_from_json(&config, json_config) == 0, .failure_msg = "unable to create config");
+    STF_EXPECT(sclip_parse_options(&config) == 0, .return_on_failure = true, .failure_msg = "unable to parse to config");
     sclip_generate(&config, stdout);
     sclip_config_destroy(&config);
-    cJSON_Delete(json_config);
 }
 
 int main(int argc, const char **argv)
