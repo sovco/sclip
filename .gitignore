@@ -1,6 +1,6 @@
 *
 !assets/
-!test/*.json
+!assets/*.json
 !src/
 !src/*.h
 !src/*.c

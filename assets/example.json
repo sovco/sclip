@@ -1,0 +1,23 @@
+{
+
+    "project": "sclip",
+    "version": "0.0.1",
+    "options": [
+        {
+            "name": "input",
+            "value-type": "string",
+            "long-opt": "--input",
+            "short-opt": "-i",
+            "description": "Input json config file.",
+            "optional": false
+        },
+        {
+            "name": "output",
+            "value-type": "string",
+            "long-opt": "--output",
+            "short-opt": "-o",
+            "description": "Output generated header file.",
+            "optional": false
+        }
+    ]
+}
