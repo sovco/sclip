@@ -21,7 +21,33 @@ Long opt can be of any lenght find the lenght of Long-opt
     n + 2 lenght for type and symbols '<' and '>'
     2 spaces after
     50 would be the description line
-2) Split the desc somehow
+1) Split the desc somehow
     jump to symbol at 50
     if space go to new line
     if alpha back up to space
+
+
+struct option {
+    ....
+    generator();
+}
+
+char *generator() {
+    switch(type)
+}
+
+I have some static content which will always stay the samme
+And I have the parsed data from json, each transformed in to an option
+For simplicity I have two standard options (help and version)
+
+so option needs to be transformed to 
+1) help string
+2) option id enum declaration
+3) option array declaration
+4) presence checker functions
+1) value getters function
+
+How to tackle this the most simple way
+Give each option a function pointer that would 
+
+

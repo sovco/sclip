@@ -95,7 +95,7 @@
     "\n"                                                                                                                                                     \
     "static inline bool sclip_opt_is_provided(const sclip_option *restrict options, const sclip_option_id id)\n"                                             \
     "{\n"                                                                                                                                                    \
-    "    return options[id].value.numeric == LONG_MIN;\n"                                                                                                    \
+    "    return options[id].value.numeric != LONG_MIN;\n"                                                                                                    \
     "}\n"                                                                                                                                                    \
     "\n"                                                                                                                                                     \
     "static inline bool sclip_is_opt(const char *arg)\n"                                                                                                     \
@@ -140,7 +140,7 @@
     "\n"                                                                                                                                                     \
     "static inline void __sclip_parse(int argc, const char **argv, sclip_option *restrict options)\n"                                                        \
     "{\n"                                                                                                                                                    \
-    "    for (register int j = 0; j < SCLIP_OPTION_VERSION_ID; j++) {\n"                                                                                     \
+    "    for (register int j = 0; j <= SCLIP_OPTION_VERSION_ID; j++) {\n"                                                                                    \
     "        for (register int i = 1; i < argc; i++) {\n"                                                                                                    \
     "            if (!sclip_is_opt(argv[i])) continue;\n"                                                                                                    \
     "            if (!sclip_opt_matches(argv[i], &options[j])) continue;\n"                                                                                  \
@@ -156,7 +156,7 @@
     "            } break;\n"                                                                                                                                 \
     "            case SCLIP_BOOL: {\n"                                                                                                                       \
     "                if (j == SCLIP_OPTION_VERSION_ID || j == SCLIP_OPTION_HELP_ID) {\n"                                                                     \
-    "                   puts(option[j].value.string);\n"                                                                                                     \
+    "                   puts(options[j].value.string);\n"                                                                                                    \
     "                   exit(EXIT_SUCCESS);\n"                                                                                                               \
     "                }\n"                                                                                                                                    \
     "                options[j].value = (sclip_value){ .numeric = 1 };\n"                                                                                    \
@@ -188,14 +188,6 @@ typedef enum {
     SCLIP_STDIN,
     SCLIP_NONTYPE,
 } sclip_option_type;
-
-typedef enum {
-    SCLIP_HELP_MENU_GENERATOR = 0,
-    SCLIP_OPTIONS_ENUM_GENERATOR,
-    SCLIP_OPTIONS_DECL_GENERATOR,
-    SCLIP_PRESENCE_CHECKERS_GENERATOR,
-    SCLIP_VALUE_GETTERS_GENERATOR
-} sclip_generator_types;
 
 static const char *sclip_config_value_types[] = {
     [SCLIP_STRING] = "string",
@@ -246,7 +238,7 @@ struct sclip_option_t
     const char *description;
     const sclip_option_type value_type;
     bool optional;
-    char *(*generator)(const sclip_option *option);
+    bool system_option;
 };
 
 struct sclip_config_t
@@ -254,7 +246,6 @@ struct sclip_config_t
     sclip_option *options;
     const char *project;
     const char *version;
-    const cJSON *const json_config;
 };
 
 struct sclip_scenario_item_t
@@ -267,16 +258,16 @@ static inline int sclip_config_create_from_file(sclip_config *restrict config, c
 static inline int sclip_config_create_from_string(sclip_config *restrict config, const char *const restrict json_string);
 static inline int sclip_config_create_from_json(sclip_config *restrict config, const cJSON *const restrict json);
 
-#define sclip_parse_options(config) \
-    __sclip_parse_options(config, sclip_config_value_types)
-static inline int __sclip_parse_options(sclip_config *restrict config, const char **config_value_types);
+#define sclip_parse_options(config, json) \
+    __sclip_parse_options(config, json, sclip_config_value_types)
+static inline int __sclip_parse_options(sclip_config *restrict config, const cJSON *const restrict json, const char **config_value_types);
 
 static inline int sclip_parse_string_attribute(const cJSON *const node, const char *tag, char **restrict ret);
 static inline int sclip_parse_bool_attribute(const cJSON *const node, const char *tag, bool *restrict ret);
 
 static inline sclip_option_type sclip_deduct_type(const char *type_str, const char **known_types);
 
-static inline sclip_option *sclip_config_allocate_option(sclip_config *config, const char *name, const char *short_opt, const char *long_opt, const char *description, const sclip_option_type type, const bool optional);
+static inline sclip_option *sclip_config_allocate_option(sclip_config *config, const char *name, const char *short_opt, const char *long_opt, const char *description, const sclip_option_type type, const bool optional, const bool system_option);
 static inline void sclip_config_destroy(sclip_config *options);
 static inline char *sclip_read_file(const char *filepath);
 static inline cJSON *sclip_read_config(const char *filepath);
@@ -317,6 +308,14 @@ static inline void __sclip_generate(const sclip_config *const restrict config, F
 #define SAA_IMPL
 #include <saa/saa.h>
 
+static inline char *__sclip_copy_string(const char *const restrict str)
+{
+    if (str == NULL) return NULL;
+    char *ret = malloc(strlen(str) + 1);
+    memcpy(ret, str, strlen(str) + 1);
+    return ret;
+}
+
 static inline int sclip_config_create_from_file(sclip_config *restrict config, const char *const restrict filepath)
 {
     if (filepath == NULL) return -1;
@@ -335,7 +334,9 @@ static inline int sclip_config_create_from_string(sclip_config *restrict config,
         sclip_print_cjson_error();
         return -1;
     }
-    return sclip_config_create_from_json(config, json_config);
+    const int res = sclip_config_create_from_json(config, json_config);
+    cJSON_Delete(json_config);
+    return res;
 }
 
 static inline int sclip_config_create_from_json(sclip_config *restrict config, const cJSON *const restrict json)
@@ -345,22 +346,14 @@ static inline int sclip_config_create_from_json(sclip_config *restrict config, c
     char *version_str = NULL;
     if (sclip_parse_string_attribute(json, "project", &project_str) != 0) return -1;
     if (sclip_parse_string_attribute(json, "version", &version_str) != 0) return -1;
-    const sclip_config tmp = { .project = project_str, .version = version_str, .json_config = json, .options = NULL };
+    const sclip_config tmp = { .project = __sclip_copy_string(project_str), .version = __sclip_copy_string(version_str), .options = NULL };
     memcpy(config, &tmp, sizeof(*config));
-    return 0;
+    return sclip_parse_options(config, json);
 }
 
-static inline char *__sclip_copy_string(const char *const restrict str)
+static inline int __sclip_parse_options(sclip_config *restrict config, const cJSON *const restrict json, const char **config_value_types)
 {
-    if (str == NULL) return NULL;
-    char *ret = malloc(strlen(str) + 1);
-    memcpy(ret, str, strlen(str) + 1);
-    return ret;
-}
-
-static inline int __sclip_parse_options(sclip_config *restrict config, const char **config_value_types)
-{
-    const cJSON *const options = cJSON_GetObjectItem(config->json_config, "options");
+    const cJSON *const options = cJSON_GetObjectItem(json, "options");
     if (options == NULL || !cJSON_IsArray(options)) {
         return -1;
     }
@@ -394,15 +387,15 @@ static inline int __sclip_parse_options(sclip_config *restrict config, const cha
             if (sclip_parse_bool_attribute(array_item, "optional", &is_optional) != 0) {
                 return -1;
             }
-            if (sclip_config_allocate_option(config, __sclip_copy_string(name), __sclip_copy_string(short_opt), __sclip_copy_string(long_opt), __sclip_copy_string(description), type, is_optional) == NULL) {
+            if (sclip_config_allocate_option(config, __sclip_copy_string(name), __sclip_copy_string(short_opt), __sclip_copy_string(long_opt), __sclip_copy_string(description), type, is_optional, false) == NULL) {
                 return -1;
             }
         }
     }
-    if (sclip_config_allocate_option(config, __sclip_copy_string("help"), __sclip_copy_string("-h"), __sclip_copy_string("--help"), __sclip_copy_string("Shows help menu"), SCLIP_BOOL, true) == NULL) {
+    if (sclip_config_allocate_option(config, __sclip_copy_string("help"), __sclip_copy_string("-h"), __sclip_copy_string("--help"), __sclip_copy_string("Shows help menu"), SCLIP_BOOL, true, true) == NULL) {
         return -1;
     }
-    if (sclip_config_allocate_option(config, __sclip_copy_string("version"), __sclip_copy_string("-v"), __sclip_copy_string("--version"), __sclip_copy_string("Shows version string"), SCLIP_BOOL, true) == NULL) {
+    if (sclip_config_allocate_option(config, __sclip_copy_string("version"), __sclip_copy_string("-v"), __sclip_copy_string("--version"), __sclip_copy_string("Shows version string"), SCLIP_BOOL, true, true) == NULL) {
         return -1;
     }
     return 0;
@@ -449,13 +442,13 @@ static inline void __sclip_generate(const sclip_config *const restrict config, F
     }
 }
 
-static inline sclip_option *sclip_config_allocate_option(sclip_config *config, const char *name, const char *short_opt, const char *long_opt, const char *description, const sclip_option_type type, const bool optional)
+static inline sclip_option *sclip_config_allocate_option(sclip_config *config, const char *name, const char *short_opt, const char *long_opt, const char *description, const sclip_option_type type, const bool optional, const bool system_option)
 {
     sclip_option **option = NULL;
     for (option = &config->options; *option != NULL; option = &((*option)->next)) {}
     *option = malloc(sizeof(**option));
     if (*option == NULL) return NULL;
-    const sclip_option tmp = (const sclip_option){ .next = NULL, .name = name, .short_opt = short_opt, .long_opt = long_opt, .description = description, .value_type = type, .optional = optional };
+    const sclip_option tmp = (const sclip_option){ .next = NULL, .name = name, .short_opt = short_opt, .long_opt = long_opt, .description = description, .value_type = type, .optional = optional, .system_option = system_option };
     memcpy(*option, &tmp, sizeof(tmp));
     return *option;
 }
@@ -474,7 +467,6 @@ static inline void sclip_config_destroy(sclip_config *config)
         free(option);
         option = tmp;
     }
-    cJSON_Delete((cJSON *)config->json_config);
 }
 
 static inline cJSON *sclip_read_config(const char *filepath)
@@ -557,10 +549,11 @@ static inline void sclip_generate_options_enum_decl(const sclip_config *config, 
     saa_arena arena = saa_arena_create(page_size);
     fprintf(file, sclip_options_enum_decl);
     for (sclip_option *option = config->options; option != NULL; option = option->next) {
+        if (option->system_option) continue;
         fprintf(file, "    SCLIP_OPTION_%s_ID,\n", __sclip_to_upper(saa_arena_push_value_string(&arena, option->name)));
     }
-    fprintf(file, "    SCLIP_OPTION_HELP_ID,\n");
-    fprintf(file, "    SCLIP_OPTION_VERSION_ID\n} sclip_option_id\n\n");
+    fputs("    SCLIP_OPTION_HELP_ID,\n", file);
+    fputs("    SCLIP_OPTION_VERSION_ID\n} sclip_option_id;\n\n", file);
     saa_arena_destroy(&arena);
 }
 
@@ -571,6 +564,7 @@ static inline void sclip_generate_options_declaration(const sclip_config *config
     saa_arena arena = saa_arena_create(page_size);
     fprintf(file, sclip_options_decl);
     for (sclip_option *option = config->options; option != NULL; option = option->next) {
+        if (option->system_option) continue;
         fprintf(file, "    [SCLIP_OPTION_%s_ID] = { ", __sclip_to_upper(saa_arena_push_value_string(&arena, option->name)));
         fprintf(file, ".long_opt = %s, ", option->long_opt != NULL ? saa_arena_push_value_strings(&arena, "\"", option->long_opt, "\"") : "\"\"");
         fprintf(file, ".short_opt = %s, ", option->short_opt != NULL ? saa_arena_push_value_strings(&arena, "\"", option->short_opt, "\"") : "\"\"");
@@ -578,8 +572,8 @@ static inline void sclip_generate_options_declaration(const sclip_config *config
         fprintf(file, ".optional = %s, ", option->optional ? "true" : "false");
         fprintf(file, ".value = { .numeric = LONG_MIN } },\n");
     }
-    fprintf(file, "    [SCLIP_OPTION_HELP_ID] = { .long_opt = \"--help\", .short_opt = \"-h\", type = SCLIP_PRESENCE, .optional = true, .value = { .string = SCLIP_HELP_STR } },\n");
-    fprintf(file, "    [SCLIP_OPTION_VERSION_ID] = { .long_opt = \"--version\", .short_opt = \"-v\", type = SCLIP_PRESENCE, .optional = true, .value = { .string = SCLIP_VERSION_STR } }\n");
+    fprintf(file, "    [SCLIP_OPTION_HELP_ID] = { .long_opt = \"--help\", .short_opt = \"-h\", .type = SCLIP_BOOL, .optional = true, .value = { .string = SCLIP_HELP_STR } },\n");
+    fprintf(file, "    [SCLIP_OPTION_VERSION_ID] = { .long_opt = \"--version\", .short_opt = \"-v\", .type = SCLIP_BOOL, .optional = true, .value = { .string = SCLIP_VERSION_STR } }\n");
     fprintf(file, "};\n\n");
     saa_arena_destroy(&arena);
 }
@@ -637,9 +631,9 @@ static inline void sclip_generate_help_string(const sclip_config *config, FILE *
     static const size_t description_max_len = 50;
     saa_arena arena = saa_arena_create(page_size);
     size_t max_opt_len = __sclip_determine_help_width(config);
-    fputs("static const char *SCLIP_HELP_STR =\n", file);
-    fputs("\"Usage:\\n\"\n", file);
-    fprintf(file, "\"%s [options]\\n\"\n", config->project);
+    fputs("#define SCLIP_HELP_STR \\\n", file);
+    fputs("\"Usage:\\n\"\\\n", file);
+    fprintf(file, "\"%s [options]\\n\"\\\n", config->project);
     for (sclip_option *option = config->options; option != NULL; option = option->next) {
         const char *const short_opt = !option->short_opt ? "  " : option->short_opt;
         const char *const long_opt = !option->long_opt ? "" : option->long_opt;
@@ -650,26 +644,26 @@ static inline void sclip_generate_help_string(const sclip_config *config, FILE *
 
         const size_t description_len = strlen(option->description);
         if (description_len <= description_max_len) {
-            fprintf(file, "%s \\n\"\n", option->description);
+            fprintf(file, "%s \\n\"\\\n", option->description);
             continue;
         }
         char **split = __sclip_split_description(&arena, option->description, description_max_len);
         const char *const padding_before_description = __sclip_make_padding(&arena, ' ', strlen(option_line) - 2);
         for (int i = 0; split[i] != NULL; i++) {
             if (i == 0) {
-                fprintf(file, "%s \\n\"\n", split[i]);
+                fprintf(file, "%s \\n\"\\\n", split[i]);
                 continue;
             }
-            fprintf(file, "\"%s%s \\n\"\n", padding_before_description, split[i]);
+            fprintf(file, "\"%s%s \\n\"\\\n", padding_before_description, split[i]);
         }
     }
-    fputs("\"\";\n\n", file);
+    fputs("\"\"\n\n", file);
     saa_arena_destroy(&arena);
 }
 
 static inline void sclip_generate_version_string(const sclip_config *config, FILE *file)
 {
-    fprintf(file, "static const char *SCLIP_VERSION_STR = \"%s %s\\n\";\n\n", config->project, config->version);
+    fprintf(file, "#define SCLIP_VERSION_STR \"%s %s\\n\"\n\n", config->project, config->version);
 }
 
 static inline void sclip_generator_value_getters(const sclip_config *config, FILE *file)
@@ -677,6 +671,7 @@ static inline void sclip_generator_value_getters(const sclip_config *config, FIL
     static const size_t page_size = 512;
     saa_arena arena = saa_arena_create(page_size);
     for (sclip_option *option = config->options; option != NULL; option = option->next) {
+        if (option->system_option) continue;
         fprintf(file, "#define sclip_opt_%s_get_value() \\\n", option->name);
         fprintf(file, "    sclip_opt_get_value_%s(&SCLIP_OPTIONS[0], SCLIP_OPTION_%s_ID)\n", sclip_getter_tail[option->value_type], __sclip_to_upper(saa_arena_push_value_string(&arena, option->name)));
     }
@@ -689,6 +684,7 @@ static inline void sclip_generator_presence_checkers(const sclip_config *config,
     static const size_t page_size = 512;
     saa_arena arena = saa_arena_create(page_size);
     for (sclip_option *option = config->options; option != NULL; option = option->next) {
+        if (option->system_option) continue;
         fprintf(file, "#define sclip_opt_%s_is_provided() \\\n", option->name);
         fprintf(file, "    sclip_opt_is_provided(&SCLIP_OPTIONS[0], SCLIP_OPTION_%s_ID)\n", __sclip_to_upper(saa_arena_push_value_string(&arena, option->name)));
     }

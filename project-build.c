@@ -1,5 +1,7 @@
 #define NOB_IMPLEMENTATION
 #include "build/deps/nob/nob.h"
+#define SCLIP_IMPL
+#include "project-build.h"
 #include <dirent.h>
 #include <errno.h>
 
@@ -24,6 +26,11 @@ static inline bool dir_exists(const char *path)
 int main(int argc, char **argv)
 {
     NOB_GO_REBUILD_URSELF(argc, argv);
+    sclip_parse(argc, (const char **)argv);
+    const char *build_type = sclip_opt_enable_debug_get_value() ? "-ggdb" : "-o3";
+    if (sclip_opt_number_is_provided()) {
+        printf("%d\n", sclip_opt_number_get_value());
+    }
     Nob_String_Builder builder;
     Nob_Cmd cmd = { 0 };
 
@@ -53,8 +60,10 @@ int main(int argc, char **argv)
         nob_cmd_append(&cmd, "cmake", "--install", "build/deps/cjson/build");
         if (!nob_cmd_run(&cmd)) return 1;
     }
-    nob_cmd_append(&cmd, "cc", "-Wall", "-Wextra", "-Wpedantic", "-std=c11", "-ggdb", "-o", "build/sclip-tests", "-Iinclude", "-Ibuild/deps/cjson/instal/include", "-Ibuild/deps/", "-Lbuild/deps/cjson/instal/lib", "test/sclip-tests.c", "-l:libcjson.a");
-    if (!nob_cmd_run(&cmd)) return 1;
+    if (sclip_opt_build_tests_get_value()) {
+        nob_cmd_append(&cmd, "cc", "-Wall", "-Wextra", "-Wpedantic", "-std=c11", build_type, "-o", "build/sclip-tests", "-Iinclude", "-Ibuild/deps/cjson/instal/include", "-Ibuild/deps/", "-Lbuild/deps/cjson/instal/lib", "test/sclip-tests.c", "-l:libcjson.a");
+        if (!nob_cmd_run(&cmd)) return 1;
+    }
     // nob_cmd_append(&cmd, "cc", "-Wall", "-Wextra", "-Wpedantic", "-std=c11", "-ggdb", "-o", "build/sclip-build", "-Iinclude", "-Ibuild/deps/", "test/sclip-build.c");
     // if (!nob_cmd_run(&cmd)) return 1;
     return 0;
