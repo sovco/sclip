@@ -68,6 +68,30 @@ static const char *BUILD_OPTIONS =
     "    ]"
     "}";
 
+static const char *SCLIP_OPTIONS =
+    "{"
+    "    \"project\": \"sclip\","
+    "    \"version\": \"0.0.1\","
+    "    \"options\": ["
+    "        {"
+    "            \"name\": \"input\","
+    "            \"value-type\": \"string\","
+    "            \"long-opt\": \"--input\","
+    "            \"short-opt\": \"-i\","
+    "            \"description\": \"Input json config file.\","
+    "            \"optional\": false"
+    "        },"
+    "        {"
+    "            \"name\": \"output\","
+    "            \"value-type\": \"string\","
+    "            \"long-opt\": \"--output\","
+    "            \"short-opt\": \"-o\","
+    "            \"description\": \"Output generated header file.\","
+    "            \"optional\": false"
+    "        }"
+    "    ]"
+    "}";
+
 STF_TEST_CASE(sclip, able_to_create_config_from_json)
 {
     cJSON *json_config = cJSON_Parse(TEST_CONFIG);
@@ -94,6 +118,18 @@ STF_TEST_CASE(sclip, able_to_create_config_from_json_string_and_output_to_file)
     STF_EXPECT(file != NULL, .return_on_failure = true, .failure_msg = "unable to open file");
     sclip_config config = { 0 };
     STF_EXPECT(sclip_config_create_from_string(&config, BUILD_OPTIONS) == 0, .failure_msg = "unable to create config");
+    sclip_generate(&config, file);
+    sclip_config_destroy(&config);
+    fclose(file);
+}
+
+STF_TEST_CASE(sclip, able_to_create_config_from_json_string_and_output_to_file_)
+{
+    static const char *output_file_path = "sclip.h";
+    FILE *file = fopen(output_file_path, "w");
+    STF_EXPECT(file != NULL, .return_on_failure = true, .failure_msg = "unable to open file");
+    sclip_config config = { 0 };
+    STF_EXPECT(sclip_config_create_from_string(&config, SCLIP_OPTIONS) == 0, .failure_msg = "unable to create config");
     sclip_generate(&config, file);
     sclip_config_destroy(&config);
     fclose(file);

@@ -1,4 +1,9 @@
 *
+!assets/
+!test/*.json
+!src/
+!src/*.h
+!src/*.c
 !.gitignore
 !README.md
 !LICENSE
@@ -20,5 +25,6 @@
 !test/*/*/*.cpp
 !test/*/*/*.c
 test/nob.h
+!project-build.h
 !project-build.c
 !.clang-format

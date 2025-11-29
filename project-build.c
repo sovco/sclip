@@ -64,7 +64,7 @@ int main(int argc, char **argv)
         nob_cmd_append(&cmd, "cc", "-Wall", "-Wextra", "-Wpedantic", "-std=c11", build_type, "-o", "build/sclip-tests", "-Iinclude", "-Ibuild/deps/cjson/instal/include", "-Ibuild/deps/", "-Lbuild/deps/cjson/instal/lib", "test/sclip-tests.c", "-l:libcjson.a");
         if (!nob_cmd_run(&cmd)) return 1;
     }
-    // nob_cmd_append(&cmd, "cc", "-Wall", "-Wextra", "-Wpedantic", "-std=c11", "-ggdb", "-o", "build/sclip-build", "-Iinclude", "-Ibuild/deps/", "test/sclip-build.c");
-    // if (!nob_cmd_run(&cmd)) return 1;
+    nob_cmd_append(&cmd, "cc", "-Wall", "-Wextra", "-Wpedantic", "-std=c11", build_type, "-o", "build/sclip", "-Iinclude", "-Ibuild/deps/", "-Ibuild/deps/cjson/instal/include", "-Lbuild/deps/cjson/instal/lib", "src/sclip.c", "-l:libcjson.a");
+    if (!nob_cmd_run(&cmd)) return 1;
     return 0;
 }
