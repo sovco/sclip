@@ -50,7 +50,6 @@
     "#define sclip_parse(argc, argv) \\\n"                                                                                    \
     "    __sclip_parse(argc, argv, &SCLIP_OPTIONS[0])\n"                                                                      \
     "static inline void __sclip_parse(int argc, const char **argv, sclip_option *restrict options);\n"                        \
-    "static inline bool sclip_is_opt(const char *arg);\n"                                                                     \
     "static inline bool sclip_opt_matches(const char *arg, sclip_option *restrict option);\n"                                 \
     "static inline sclip_value sclip_opt_parse_long(const char *arg);\n"                                                      \
     "static inline sclip_value sclip_opt_parse_double(const char *arg);\n"                                                    \
@@ -99,17 +98,6 @@
     "    return options[id].value.numeric != LONG_MIN;\n"                                                                                                    \
     "}\n"                                                                                                                                                    \
     "\n"                                                                                                                                                     \
-    "static inline bool sclip_is_opt(const char *arg)\n"                                                                                                     \
-    "{\n"                                                                                                                                                    \
-    "    if (arg == NULL || strlen(arg) < 2)\n"                                                                                                              \
-    "        return false;\n"                                                                                                                                \
-    "    else if (arg[0] == '-' && arg[1] == '-')\n"                                                                                                         \
-    "        return true;\n"                                                                                                                                 \
-    "    else if (arg[0] == '-' && arg[1] != '-')\n"                                                                                                         \
-    "        return true;\n"                                                                                                                                 \
-    "    return false;\n"                                                                                                                                    \
-    "}\n"                                                                                                                                                    \
-    "\n"                                                                                                                                                     \
     "static inline bool sclip_opt_matches(const char *arg, sclip_option *restrict option)\n"                                                                 \
     "{\n"                                                                                                                                                    \
     "    assert(arg != NULL);\n"                                                                                                                             \
@@ -141,9 +129,12 @@
     "\n"                                                                                                                                                     \
     "static inline void __sclip_parse(int argc, const char **argv, sclip_option *restrict options)\n"                                                        \
     "{\n"                                                                                                                                                    \
-    "    for (register int j = 0; j <= SCLIP_OPTION_VERSION_ID; j++) {\n"                                                                                    \
+    "    if(argc == 1) {\n"                                                                                                                                  \
+    "        fputs(SCLIP_HELP_STR, stdout);\n"                                                                                                               \
+    "        exit(EXIT_SUCCESS);\n"                                                                                                                          \
+    "    }\n"                                                                                                                                                \
+    "    for (register int j = SCLIP_OPTION_VERSION_ID; j >= 0; j--) {\n"                                                                                    \
     "        for (register int i = 1; i < argc; i++) {\n"                                                                                                    \
-    "            if (!sclip_is_opt(argv[i])) continue;\n"                                                                                                    \
     "            if (!sclip_opt_matches(argv[i], &options[j])) continue;\n"                                                                                  \
     "            switch (options[j].type) {\n"                                                                                                               \
     "            case SCLIP_STRING: {\n"                                                                                                                     \
@@ -554,14 +545,14 @@ static inline void sclip_generate_options_enum_decl(const sclip_config *config, 
         fprintf(file, "    SCLIP_OPTION_%s_ID,\n", __sclip_to_upper(saa_arena_push_value_string(&arena, option->name)));
     }
     fputs("    SCLIP_OPTION_HELP_ID,\n", file);
-    fputs("    SCLIP_OPTION_VERSION_ID\n} sclip_utils_option_id;\n\n", file);
+    fputs("    SCLIP_OPTION_VERSION_ID\n} sclip_option_id;\n\n", file);
     saa_arena_destroy(&arena);
 }
 
 static inline void sclip_generate_options_declaration(const sclip_config *config, FILE *file)
 {
     static const size_t page_size = 512;
-    static const char *sclip_utils_options_decl = "static sclip_utils_option SCLIP_OPTIONS[] = {\n";
+    static const char *sclip_utils_options_decl = "static sclip_option SCLIP_OPTIONS[] = {\n";
     saa_arena arena = saa_arena_create(page_size);
     fprintf(file, sclip_utils_options_decl);
     for (sclip_utils_option *option = config->options; option != NULL; option = option->next) {

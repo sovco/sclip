@@ -12,7 +12,7 @@ int main(int argc, const char **argv)
     if (sclip_config_create_from_file(&config, sclip_opt_input_get_value()) < 0) return EXIT_FAILURE;
     if (!output_file) return EXIT_FAILURE;
     sclip_generate(&config, output_file);
-
+    sclip_config_destroy(&config);
     fclose(output_file);
     return EXIT_SUCCESS;
 }

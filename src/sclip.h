@@ -64,7 +64,6 @@ static sclip_option SCLIP_OPTIONS[] = {
 #define sclip_parse(argc, argv) \
     __sclip_parse(argc, argv, &SCLIP_OPTIONS[0])
 static inline void __sclip_parse(int argc, const char **argv, sclip_option *restrict options);
-static inline bool sclip_is_opt(const char *arg);
 static inline bool sclip_opt_matches(const char *arg, sclip_option *restrict option);
 static inline sclip_value sclip_opt_parse_long(const char *arg);
 static inline sclip_value sclip_opt_parse_double(const char *arg);
@@ -121,17 +120,6 @@ static inline bool sclip_opt_is_provided(const sclip_option *restrict options, c
     return options[id].value.numeric != LONG_MIN;
 }
 
-static inline bool sclip_is_opt(const char *arg)
-{
-    if (arg == NULL || strlen(arg) < 2)
-        return false;
-    else if (arg[0] == '-' && arg[1] == '-')
-        return true;
-    else if (arg[0] == '-' && arg[1] != '-')
-        return true;
-    return false;
-}
-
 static inline bool sclip_opt_matches(const char *arg, sclip_option *restrict option)
 {
     assert(arg != NULL);
@@ -163,9 +151,12 @@ static inline sclip_value sclip_opt_parse_double(const char *arg)
 
 static inline void __sclip_parse(int argc, const char **argv, sclip_option *restrict options)
 {
-    for (register int j = 0; j <= SCLIP_OPTION_VERSION_ID; j++) {
+    if(argc == 1) {
+        fputs(SCLIP_HELP_STR, stdout);
+        exit(EXIT_SUCCESS);
+    }
+    for (register int j = SCLIP_OPTION_VERSION_ID; j >= 0; j--) {
         for (register int i = 1; i < argc; i++) {
-            if (!sclip_is_opt(argv[i])) continue;
             if (!sclip_opt_matches(argv[i], &options[j])) continue;
             switch (options[j].type) {
             case SCLIP_STRING: {
