@@ -101,6 +101,7 @@
     "static inline bool sclip_opt_matches(const char *arg, sclip_option *restrict option)\n"                                                                 \
     "{\n"                                                                                                                                                    \
     "    assert(arg != NULL);\n"                                                                                                                             \
+    "    if (arg[0] != '-') return false;\n"                                                                                                                 \
     "    if (option->short_opt != NULL && strcmp(arg, option->short_opt) == 0)\n"                                                                            \
     "        return true;\n"                                                                                                                                 \
     "    else if (option->long_opt != NULL && strcmp(arg, option->long_opt) == 0)\n"                                                                         \
