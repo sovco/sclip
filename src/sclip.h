@@ -12,6 +12,7 @@ extern "C" {
 #include <stddef.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <unistd.h>
 
 typedef enum {
     SCLIP_STRING,
@@ -29,6 +30,12 @@ typedef union {
 
 typedef struct
 {
+    const void *const data;
+    const size_t lenght;
+} sclip_stdin_content;
+
+typedef struct
+{
     const char *long_opt;
     const char *short_opt;
     const sclip_option_type type;
@@ -39,10 +46,11 @@ typedef struct
 #define SCLIP_HELP_STR \
 "Usage:\n"\
 "sclip [options]\n"\
-"    -i ,--input   <string>    Input json config file. \n"\
-"    -o ,--output  <string>    Output generated header file. \n"\
-"    -h ,--help    <bool>      Shows help menu \n"\
-"    -v ,--version <bool>      Shows version string \n"\
+"    -i, --input   <string>    Input json config file. \n"\
+"    -o, --output  <string>    Output generated header file. \n"\
+"    --, --stdin   <stdin>     Use stdin as input \n"\
+"    -h, --help    <bool>      Shows help menu \n"\
+"    -v, --version <bool>      Shows version string \n"\
 ""
 
 #define SCLIP_VERSION_STR "sclip 0.0.1\n"
@@ -50,13 +58,15 @@ typedef struct
 typedef enum {
     SCLIP_OPTION_INPUT_ID,
     SCLIP_OPTION_OUTPUT_ID,
+    SCLIP_OPTION_STDIN_INPUT_ID,
     SCLIP_OPTION_HELP_ID,
     SCLIP_OPTION_VERSION_ID
 } sclip_option_id;
 
 static sclip_option SCLIP_OPTIONS[] = {
-    [SCLIP_OPTION_INPUT_ID] = { .long_opt = "--input", .short_opt = "-i", .type = SCLIP_STRING, .optional = false, .value = { .numeric = LONG_MIN } },
-    [SCLIP_OPTION_OUTPUT_ID] = { .long_opt = "--output", .short_opt = "-o", .type = SCLIP_STRING, .optional = false, .value = { .numeric = LONG_MIN } },
+    [SCLIP_OPTION_INPUT_ID] = { .long_opt = "--input", .short_opt = "-i", .type = SCLIP_STRING, .optional = true, .value = { .numeric = LONG_MIN } },
+    [SCLIP_OPTION_OUTPUT_ID] = { .long_opt = "--output", .short_opt = "-o", .type = SCLIP_STRING, .optional = true, .value = { .numeric = LONG_MIN } },
+    [SCLIP_OPTION_STDIN_INPUT_ID] = { .long_opt = "--stdin", .short_opt = "--", .type = SCLIP_STDIN, .optional = true, .value = { .numeric = LONG_MIN } },
     [SCLIP_OPTION_HELP_ID] = { .long_opt = "--help", .short_opt = "-h", .type = SCLIP_BOOL, .optional = true, .value = { .string = SCLIP_HELP_STR } },
     [SCLIP_OPTION_VERSION_ID] = { .long_opt = "--version", .short_opt = "-v", .type = SCLIP_BOOL, .optional = true, .value = { .string = SCLIP_VERSION_STR } }
 };
@@ -72,6 +82,8 @@ static inline long sclip_opt_get_value_long(const sclip_option *restrict options
 static inline bool sclip_opt_get_value_bool(const sclip_option *restrict options, const sclip_option_id id);
 static inline const char *sclip_opt_get_value_string(const sclip_option *restrict options, const sclip_option_id id);
 static inline bool sclip_opt_is_provided(const sclip_option *restrict options, const sclip_option_id id);
+static inline sclip_stdin_content sclip_get_stdin_contents();
+static inline void sclip_free_stdin_content(sclip_stdin_content *restrict const content);
 
 #ifdef __cplusplus
 }// extern "C"
@@ -81,11 +93,15 @@ static inline bool sclip_opt_is_provided(const sclip_option *restrict options, c
     sclip_opt_is_provided(&SCLIP_OPTIONS[0], SCLIP_OPTION_INPUT_ID)
 #define sclip_opt_output_is_provided() \
     sclip_opt_is_provided(&SCLIP_OPTIONS[0], SCLIP_OPTION_OUTPUT_ID)
+#define sclip_opt_stdin_input_is_provided() \
+    sclip_opt_is_provided(&SCLIP_OPTIONS[0], SCLIP_OPTION_STDIN_INPUT_ID)
 
 #define sclip_opt_input_get_value() \
     sclip_opt_get_value_string(&SCLIP_OPTIONS[0], SCLIP_OPTION_INPUT_ID)
 #define sclip_opt_output_get_value() \
     sclip_opt_get_value_string(&SCLIP_OPTIONS[0], SCLIP_OPTION_OUTPUT_ID)
+#define sclip_opt_stdin_input_get_value() \
+    sclip_opt_get_value_string(&SCLIP_OPTIONS[0], SCLIP_OPTION_STDIN_INPUT_ID)
 
 #ifdef SCLIP_IMPL
 
@@ -169,6 +185,11 @@ static inline void __sclip_parse(int argc, const char **argv, sclip_option *rest
             case SCLIP_DOUBLE: {
                 options[j].value = sclip_opt_parse_double(argv[i + 1]);
             } break;
+            case SCLIP_STDIN: {
+                if(!isatty(STDIN_FILENO)) {
+                   options[j].value = (sclip_value){ .numeric = 1 };
+                }
+            } break;
             case SCLIP_BOOL: {
                 if (j == SCLIP_OPTION_VERSION_ID || j == SCLIP_OPTION_HELP_ID) {
                    puts(options[j].value.string);
@@ -186,6 +207,37 @@ static inline void __sclip_parse(int argc, const char **argv, sclip_option *rest
             exit(EXIT_FAILURE);
         }
     }
+}
+
+static inline sclip_stdin_content sclip_get_stdin_contents()
+{
+    static const size_t default_size = 2;
+    char *data = NULL;
+    char buffer[default_size];
+    size_t maximum_size = default_size;
+    size_t total_bytes_read = 0;
+    size_t bytes_read = 0;
+
+    if ((data = malloc(default_size)) == NULL) {
+        return (sclip_stdin_content){ .data = NULL, .lenght = 0 };
+    }
+
+    while ((bytes_read = fread(buffer, 1, default_size, stdin)) > 0) {
+        if ((total_bytes_read + bytes_read) > maximum_size) {
+            maximum_size = 2 * maximum_size;
+            if ((data = realloc(data, maximum_size)) == NULL) {
+                return (sclip_stdin_content){ .data = NULL, .lenght = 0 };
+            }
+        }
+        memcpy(data + total_bytes_read, buffer, bytes_read);
+        total_bytes_read += bytes_read;
+    }
+    return (sclip_stdin_content){ .data = data, .lenght = total_bytes_read };
+}
+
+static inline void sclip_free_stdin_content(sclip_stdin_content *restrict const content)
+{
+    free((void *)content->data);
 }
 
 #ifdef __cplusplus
