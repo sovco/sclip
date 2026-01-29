@@ -8,10 +8,12 @@ sclip executable has the following interface,
 ```bash
 Usage:
 sclip [options]
-    -i ,--input   <string>    Input json config file.
-    -o ,--output  <string>    Output generated header file.
-    -h ,--help    <bool>      Shows help menu.
-    -v ,--version <bool>      Shows version string.
+    -i, --input   <string>    Input json config file. 
+    -o, --output  <string>    Output generated header file. 
+    --, --stdin   <stdin>     Use stdin as input 
+    -h, --help    <bool>      Shows help menu 
+    -v, --version <bool>      Shows version string 
+
 ```
 As input it accepts a json configuration file and outputs a generated C header file.
 This generated C header file then can be used to parse cli args in any C/Cpp application.
