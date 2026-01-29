@@ -66,8 +66,8 @@ Example
 ```
 In the particular case of the above mentioned config a function sclip_opt_stdin_input_get_value() will be generated.
 With it you can check if the file was provided.
-If the file is provided you need to call function sclip_get_stdin_contents() that returns sclip_stdin_content struct.
-sclip_stdin_content has two properties data and lenght, data holds the contents of stdin
+If the file is provided you need to call function sclip_get_stdin_contents() that returns sclip_stdin_content struct,
+sclip_stdin_content has two properties data and lenght, data holds the contents of stdin.
 To free sclip_stdin_content call sclip_free_stdin_content.
 Example code,
 ```c
