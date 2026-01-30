@@ -15,10 +15,10 @@ int main(int argc, const char **argv)
     }
     if (!output_file) return EXIT_FAILURE;
     sclip_config config = { 0 };
-    if (!sclip_opt_stdin_input_is_provided() && !sclip_opt_input_is_provided()) {
+    if (!sclip_is_stdin_available() && !sclip_opt_input_is_provided()) {
         puts("No input was provided.");
         return EXIT_FAILURE;
-    } else if (sclip_opt_stdin_input_is_provided()) {
+    } else if (sclip_is_stdin_available()) {
         sclip_stdin_content contents = sclip_get_stdin_contents();
         if (sclip_config_create_from_string(&config, contents.data) < 0) return EXIT_FAILURE;
         sclip_free_stdin_content(&contents);

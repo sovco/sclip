@@ -17,14 +17,6 @@
             "short-opt": "-o",
             "description": "Output generated header file.",
             "optional": true
-        },
-        {
-            "name": "stdin_input",
-            "value-type": "stdin",
-            "long-opt": "--stdin",
-            "short-opt": "--",
-            "description": "Use stdin as input",
-            "optional": true 
         }
     ]
 }

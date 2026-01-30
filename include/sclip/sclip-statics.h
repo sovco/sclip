@@ -59,6 +59,7 @@
     "static inline bool sclip_opt_get_value_bool(const sclip_option *restrict options, const sclip_option_id id);\n"          \
     "static inline const char *sclip_opt_get_value_string(const sclip_option *restrict options, const sclip_option_id id);\n" \
     "static inline bool sclip_opt_is_provided(const sclip_option *restrict options, const sclip_option_id id);\n"             \
+    "static inline bool sclip_is_stdin_available();\n"                                                                        \
     "static inline sclip_stdin_content sclip_get_stdin_contents();\n"                                                         \
     "static inline void sclip_free_stdin_content(sclip_stdin_content *restrict const content);\n"                             \
     "\n"                                                                                                                      \
@@ -150,11 +151,6 @@
     "            case SCLIP_DOUBLE: {\n"                                                                                                                     \
     "                options[j].value = sclip_opt_parse_double(argv[i + 1]);\n"                                                                              \
     "            } break;\n"                                                                                                                                 \
-    "            case SCLIP_STDIN: {\n"                                                                                                                      \
-    "                if(!isatty(STDIN_FILENO)) {\n"                                                                                                          \
-    "                   options[j].value = (sclip_value){ .numeric = 1 };\n"                                                                                 \
-    "                }\n"                                                                                                                                    \
-    "            } break;\n"                                                                                                                                 \
     "            case SCLIP_BOOL: {\n"                                                                                                                       \
     "                if (j == SCLIP_OPTION_VERSION_ID || j == SCLIP_OPTION_HELP_ID) {\n"                                                                     \
     "                   puts(options[j].value.string);\n"                                                                                                    \
@@ -174,9 +170,14 @@
     "    }\n"                                                                                                                                                \
     "}\n"                                                                                                                                                    \
     "\n"                                                                                                                                                     \
+    "static inline bool sclip_is_stdin_available()\n"                                                                                                        \
+    "{\n"                                                                                                                                                    \
+    "    return !isatty(STDIN_FILENO);\n"                                                                                                                    \
+    "}\n"                                                                                                                                                    \
+    "\n"                                                                                                                                                     \
     "static inline sclip_stdin_content sclip_get_stdin_contents()\n"                                                                                         \
     "{\n"                                                                                                                                                    \
-    "    static const size_t default_size = 2;\n"                                                                                                            \
+    "    static const size_t default_size = 4096;\n"                                                                                                         \
     "    char *data = NULL;\n"                                                                                                                               \
     "    char buffer[default_size];\n"                                                                                                                       \
     "    size_t maximum_size = default_size;\n"                                                                                                              \

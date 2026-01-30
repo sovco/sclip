@@ -10,7 +10,6 @@ Usage:
 sclip [options]
     -i, --input   <string>    Input json config file. 
     -o, --output  <string>    Output generated header file. 
-    --, --stdin   <stdin>     Use stdin as input 
     -h, --help    <bool>      Shows help menu 
     -v, --version <bool>      Shows version string 
 
@@ -48,32 +47,9 @@ The config is supposed to look like this (you can also find it in assets/example
 
 # Handling of stdin
 
-In order to read the contents of stdin you need to specify an option in the cconfig with type stdin.
-Example
-```json
-{
-    "project": "sclip",
-    "version": "0.0.1",
-    "options": [
-        {
-            "name": "stdin_input",
-            "value-type": "stdin",
-            "long-opt": "--stdin",
-            "short-opt": "--",
-            "description": "Use stdin as input",
-            "optional": true 
-        }
-    ]
-}
-```
-In the particular case of the above mentioned config a function sclip_opt_stdin_input_get_value() will be generated.
-With it you can check if the file was provided.
-If the file is provided you need to call function sclip_get_stdin_contents() that returns sclip_stdin_content struct,
-sclip_stdin_content has two properties data and lenght, data holds the contents of stdin.
-To free sclip_stdin_content call sclip_free_stdin_content.
 Example code,
 ```c
-if (sclip_opt_stdin_input_is_provided()) {
+if (sclip_is_stdin_available()) {
     sclip_stdin_content contents = sclip_get_stdin_contents();
     // ...
     sclip_free_stdin_content(&contents);
@@ -82,7 +58,7 @@ if (sclip_opt_stdin_input_is_provided()) {
 
 # Dependencies
 
-This project depends on saa and cJSON and there acquired during the build process.
+This project depends on saa and cJSON, cJSON is fetched automatically during the build process.
 Build process requires
 1) gcc or clang
 2) cmake (to configure cJSON) 
