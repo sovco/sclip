@@ -72,5 +72,5 @@ To build run these commands
 mkdir -p build/deps/nob
 curl -Lo build/deps/nob/nob.h https://raw.githubusercontent.com/tsoding/nob.h/refs/heads/main/nob.h
 gcc -o project-build project-build.c 
-./project-build [--build-tests] [--enable-debug]
+./project-build [--build-tests | [--build-tests && --run-tests]] [--debug] [--install]
 ```

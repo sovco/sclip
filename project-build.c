@@ -5,11 +5,6 @@
 #include <dirent.h>
 #include <errno.h>
 
-static inline bool file_exists(const char *path)
-{
-    return access(path, F_OK) == 0;
-}
-
 static inline bool dir_exists(const char *path)
 {
     DIR *dir = opendir(path);
@@ -26,11 +21,10 @@ static inline bool dir_exists(const char *path)
 int main(int argc, char **argv)
 {
     NOB_GO_REBUILD_URSELF(argc, argv);
-    sclip_parse(argc, (const char **)argv);
-    const char *build_type = sclip_opt_enable_debug_get_value() ? "-ggdb" : "-o3";
-    if (sclip_opt_number_is_provided()) {
-        printf("%d\n", sclip_opt_number_get_value());
+    if (sclip_parse(argc, (const char **)argv) == SCLIP_PARSE_VERS_OR_HELP) {
+        return 0;
     }
+    const char *build_type = sclip_opt_debug_get_value() ? "-ggdb" : "-o3";
     Nob_String_Builder builder;
     Nob_Cmd cmd = { 0 };
 
@@ -60,11 +54,19 @@ int main(int argc, char **argv)
         nob_cmd_append(&cmd, "cmake", "--install", "build/deps/cjson/build");
         if (!nob_cmd_run(&cmd)) return 1;
     }
+    nob_cmd_append(&cmd, "cc", "-Wall", "-Wextra", "-Wpedantic", "-std=c11", build_type, "-o", "build/sclip", "-Iinclude", "-Ibuild/deps/", "-Ibuild/deps/cjson/instal/include", "-Lbuild/deps/cjson/instal/lib", "src/sclip.c", "-l:libcjson.a");
+    if (!nob_cmd_run(&cmd)) return 1;
     if (sclip_opt_build_tests_get_value()) {
         nob_cmd_append(&cmd, "cc", "-Wall", "-Wextra", "-Wpedantic", "-std=c11", build_type, "-o", "build/sclip-tests", "-Iinclude", "-Ibuild/deps/cjson/instal/include", "-Ibuild/deps/", "-Lbuild/deps/cjson/instal/lib", "test/sclip-tests.c", "-l:libcjson.a");
         if (!nob_cmd_run(&cmd)) return 1;
+        if (sclip_opt_run_tests_get_value()) {
+            nob_cmd_append(&cmd, "./build/sclip-tests");
+            if (!nob_cmd_run(&cmd)) return 1;
+        }
     }
-    nob_cmd_append(&cmd, "cc", "-Wall", "-Wextra", "-Wpedantic", "-std=c11", build_type, "-o", "build/sclip", "-Iinclude", "-Ibuild/deps/", "-Ibuild/deps/cjson/instal/include", "-Lbuild/deps/cjson/instal/lib", "src/sclip.c", "-l:libcjson.a");
-    if (!nob_cmd_run(&cmd)) return 1;
+    if (sclip_opt_install_get_value()) {
+        nob_cmd_append(&cmd, "cp", "build/sclip", "/usr/bin/");
+        if (!nob_cmd_run(&cmd)) return 1;
+    }
     return 0;
 }

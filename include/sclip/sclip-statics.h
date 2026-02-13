@@ -1,56 +1,64 @@
 #ifndef SCLIP_STATICS_H
 #define SCLIP_STATICS_H
 
-#define __SCLIP_STATIC_BLOCK_INCLUDES_DEFS \
-    "#ifndef SCLIP_H\n"                    \
-    "#define SCLIP_H\n"                    \
-    "\n"                                   \
-    "#ifdef __cplusplus\n"                 \
-    "extern \"C\" {\n"                     \
-    "#endif\n"                             \
-    "\n"                                   \
-    "#include <stdbool.h>\n"               \
-    "#include <string.h>\n"                \
-    "#include <limits.h>\n"                \
-    "#include <stdlib.h>\n"                \
-    "#include <stddef.h>\n"                \
-    "#include <stdio.h>\n"                 \
-    "#include <stdint.h>\n"                \
-    "#include <unistd.h>\n"                \
-    "\n"                                   \
-    "typedef enum {\n"                     \
-    "    SCLIP_STRING,\n"                  \
-    "    SCLIP_LONG,\n"                    \
-    "    SCLIP_DOUBLE,\n"                  \
-    "    SCLIP_BOOL,\n"                    \
-    "    SCLIP_STDIN,\n"                   \
-    "} sclip_option_type;\n"               \
-    "\n"                                   \
-    "typedef union {\n"                    \
-    "    long numeric;\n"                  \
-    "    double real;\n"                   \
-    "    const char *string;\n"            \
-    "} sclip_value;\n"                     \
-    "\n"                                   \
-    "typedef struct\n"                     \
-    "{\n"                                  \
-    "    const void *const data;\n"        \
-    "    const size_t lenght;\n"           \
-    "} sclip_stdin_content;\n"             \
-    "\n"                                   \
-    "typedef struct\n"                     \
-    "{\n"                                  \
-    "    const char *long_opt;\n"          \
-    "    const char *short_opt;\n"         \
-    "    const sclip_option_type type;\n"  \
-    "    sclip_value value;\n"             \
-    "    const bool optional;\n"           \
+#define __SCLIP_STATIC_BLOCK_INCLUDES_DEFS               \
+    "#ifndef SCLIP_H\n"                                  \
+    "#define SCLIP_H\n"                                  \
+    "\n"                                                 \
+    "#ifdef __cplusplus\n"                               \
+    "extern \"C\" {\n"                                   \
+    "#endif\n"                                           \
+    "\n"                                                 \
+    "#include <stdbool.h>\n"                             \
+    "#include <string.h>\n"                              \
+    "#include <limits.h>\n"                              \
+    "#include <stdlib.h>\n"                              \
+    "#include <stddef.h>\n"                              \
+    "#include <stdio.h>\n"                               \
+    "#include <stdint.h>\n"                              \
+    "#include <unistd.h>\n"                              \
+    "\n"                                                 \
+    "typedef enum {\n"                                   \
+    "    SCLIP_STRING,\n"                                \
+    "    SCLIP_LONG,\n"                                  \
+    "    SCLIP_DOUBLE,\n"                                \
+    "    SCLIP_BOOL,\n"                                  \
+    "    SCLIP_STDIN,\n"                                 \
+    "} sclip_option_type;\n"                             \
+    "\n"                                                 \
+    "typedef enum {\n"                                   \
+    "    SCLIP_PARSE_VERS_OR_HELP = -3,\n"               \
+    "    SCLIP_PARSE_NO_ARGS = -2,\n"                    \
+    "    SCLIP_PARSE_MANDATORY_ARG_NOT_PROVIDED = -1,\n" \
+    "    SCLIP_PARSE_ALL_OK = 0,\n"                      \
+    "} sclip_parse_ret;\n"                               \
+    "\n"                                                 \
+    "typedef union {\n"                                  \
+    "    long numeric;\n"                                \
+    "    double real;\n"                                 \
+    "    const char *string;\n"                          \
+    "} sclip_value;\n"                                   \
+    "\n"                                                 \
+    "typedef struct\n"                                   \
+    "{\n"                                                \
+    "    const void *const data;\n"                      \
+    "    const size_t lenght;\n"                         \
+    "} sclip_stdin_content;\n"                           \
+    "\n"                                                 \
+    "typedef struct\n"                                   \
+    "{\n"                                                \
+    "    const char *long_opt;\n"                        \
+    "    const char *short_opt;\n"                       \
+    "    const sclip_option_type type;\n"                \
+    "    sclip_value value;\n"                           \
+    "    const bool optional;\n"                         \
     "} sclip_option;\n\n"
 
 #define __SCLIP_STATIC_BLOCK_FUNC_DECL                                                                                        \
     "#define sclip_parse(argc, argv) \\\n"                                                                                    \
     "    __sclip_parse(argc, argv, &SCLIP_OPTIONS[0])\n"                                                                      \
-    "static inline void __sclip_parse(int argc, const char **argv, sclip_option *restrict options);\n"                        \
+    "static inline sclip_parse_ret __sclip_parse(int argc, const char **argv, sclip_option *restrict options);\n"             \
+    "static inline void sclip_print_help();\n"                                                                                \
     "static inline bool sclip_opt_matches(const char *arg, sclip_option *restrict option);\n"                                 \
     "static inline sclip_value sclip_opt_parse_long(const char *arg);\n"                                                      \
     "static inline sclip_value sclip_opt_parse_double(const char *arg);\n"                                                    \
@@ -132,11 +140,10 @@
     "    return (sclip_value){ .real = ret };\n"                                                                                                             \
     "}\n"                                                                                                                                                    \
     "\n"                                                                                                                                                     \
-    "static inline void __sclip_parse(int argc, const char **argv, sclip_option *restrict options)\n"                                                        \
+    "static inline sclip_parse_ret  __sclip_parse(int argc, const char **argv, sclip_option *restrict options)\n"                                            \
     "{\n"                                                                                                                                                    \
     "    if(argc == 1) {\n"                                                                                                                                  \
-    "        fputs(SCLIP_HELP_STR, stdout);\n"                                                                                                               \
-    "        exit(EXIT_SUCCESS);\n"                                                                                                                          \
+    "        return SCLIP_PARSE_NO_ARGS;\n"                                                                                                                  \
     "    }\n"                                                                                                                                                \
     "    for (register int j = SCLIP_OPTION_VERSION_ID; j >= 0; j--) {\n"                                                                                    \
     "        for (register int i = 1; i < argc; i++) {\n"                                                                                                    \
@@ -153,8 +160,8 @@
     "            } break;\n"                                                                                                                                 \
     "            case SCLIP_BOOL: {\n"                                                                                                                       \
     "                if (j == SCLIP_OPTION_VERSION_ID || j == SCLIP_OPTION_HELP_ID) {\n"                                                                     \
-    "                   puts(options[j].value.string);\n"                                                                                                    \
-    "                   exit(EXIT_SUCCESS);\n"                                                                                                               \
+    "                   fputs(options[j].value.string, stdout);\n"                                                                                           \
+    "                   return SCLIP_PARSE_VERS_OR_HELP;\n"                                                                                                  \
     "                }\n"                                                                                                                                    \
     "                options[j].value = (sclip_value){ .numeric = 1 };\n"                                                                                    \
     "            } break;\n"                                                                                                                                 \
@@ -165,9 +172,15 @@
     "        }\n"                                                                                                                                            \
     "        if (!options[j].optional && options[j].value.numeric == LONG_MIN) {\n"                                                                          \
     "            fprintf(stderr, \"Mandatory option/value %s, %s was not provided\\nRefer to --help, -h\\n\", options[j].long_opt, options[j].short_opt);\n" \
-    "            exit(EXIT_FAILURE);\n"                                                                                                                      \
+    "            return SCLIP_PARSE_MANDATORY_ARG_NOT_PROVIDED;\n"                                                                                           \
     "        }\n"                                                                                                                                            \
     "    }\n"                                                                                                                                                \
+    "    return SCLIP_PARSE_ALL_OK;\n"                                                                                                                       \
+    "}\n"                                                                                                                                                    \
+    "\n"                                                                                                                                                     \
+    "static inline void sclip_print_help()\n"                                                                                                                \
+    "{\n"                                                                                                                                                    \
+    "    fputs(SCLIP_HELP_STR, stdout);\n"                                                                                                                   \
     "}\n"                                                                                                                                                    \
     "\n"                                                                                                                                                     \
     "static inline bool sclip_is_stdin_available()\n"                                                                                                        \

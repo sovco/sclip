@@ -22,6 +22,13 @@ typedef enum {
     SCLIP_STDIN,
 } sclip_option_type;
 
+typedef enum {
+    SCLIP_PARSE_VERS_OR_HELP = -3,
+    SCLIP_PARSE_NO_ARGS = -2,
+    SCLIP_PARSE_MANDATORY_ARG_NOT_PROVIDED = -1,
+    SCLIP_PARSE_ALL_OK = 0,
+} sclip_parse_ret;
+
 typedef union {
     long numeric;
     double real;
@@ -70,7 +77,8 @@ static sclip_option SCLIP_OPTIONS[] = {
 
 #define sclip_parse(argc, argv) \
     __sclip_parse(argc, argv, &SCLIP_OPTIONS[0])
-static inline void __sclip_parse(int argc, const char **argv, sclip_option *restrict options);
+static inline sclip_parse_ret __sclip_parse(int argc, const char **argv, sclip_option *restrict options);
+static inline void sclip_print_help();
 static inline bool sclip_opt_matches(const char *arg, sclip_option *restrict option);
 static inline sclip_value sclip_opt_parse_long(const char *arg);
 static inline sclip_value sclip_opt_parse_double(const char *arg);
@@ -160,11 +168,10 @@ static inline sclip_value sclip_opt_parse_double(const char *arg)
     return (sclip_value){ .real = ret };
 }
 
-static inline void __sclip_parse(int argc, const char **argv, sclip_option *restrict options)
+static inline sclip_parse_ret  __sclip_parse(int argc, const char **argv, sclip_option *restrict options)
 {
     if(argc == 1) {
-        fputs(SCLIP_HELP_STR, stdout);
-        exit(EXIT_SUCCESS);
+        return SCLIP_PARSE_NO_ARGS;
     }
     for (register int j = SCLIP_OPTION_VERSION_ID; j >= 0; j--) {
         for (register int i = 1; i < argc; i++) {
@@ -181,8 +188,8 @@ static inline void __sclip_parse(int argc, const char **argv, sclip_option *rest
             } break;
             case SCLIP_BOOL: {
                 if (j == SCLIP_OPTION_VERSION_ID || j == SCLIP_OPTION_HELP_ID) {
-                   puts(options[j].value.string);
-                   exit(EXIT_SUCCESS);
+                   fputs(options[j].value.string, stdout);
+                   return SCLIP_PARSE_VERS_OR_HELP;
                 }
                 options[j].value = (sclip_value){ .numeric = 1 };
             } break;
@@ -193,9 +200,15 @@ static inline void __sclip_parse(int argc, const char **argv, sclip_option *rest
         }
         if (!options[j].optional && options[j].value.numeric == LONG_MIN) {
             fprintf(stderr, "Mandatory option/value %s, %s was not provided\nRefer to --help, -h\n", options[j].long_opt, options[j].short_opt);
-            exit(EXIT_FAILURE);
+            return SCLIP_PARSE_MANDATORY_ARG_NOT_PROVIDED;
         }
     }
+    return SCLIP_PARSE_ALL_OK;
+}
+
+static inline void sclip_print_help()
+{
+    fputs(SCLIP_HELP_STR, stdout);
 }
 
 static inline bool sclip_is_stdin_available()

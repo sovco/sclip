@@ -12,6 +12,7 @@ extern "C" {
 #include <stddef.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <unistd.h>
 
 typedef enum {
     SCLIP_STRING,
@@ -21,11 +22,24 @@ typedef enum {
     SCLIP_STDIN,
 } sclip_option_type;
 
+typedef enum {
+    SCLIP_PARSE_VERS_OR_HELP = -3,
+    SCLIP_PARSE_NO_ARGS = -2,
+    SCLIP_PARSE_MANDATORY_ARG_NOT_PROVIDED = -1,
+    SCLIP_PARSE_ALL_OK = 0,
+} sclip_parse_ret;
+
 typedef union {
     long numeric;
     double real;
     const char *string;
 } sclip_value;
+
+typedef struct
+{
+    const void *const data;
+    const size_t lenght;
+} sclip_stdin_content;
 
 typedef struct
 {
@@ -39,35 +53,38 @@ typedef struct
 #define SCLIP_HELP_STR \
 "Usage:\n"\
 "project-build [options]\n"\
-"    -t ,--build-tests  <bool>      this optiona will enable test builds \n"\
-"    -d ,--enable-debug <bool>      this options will build a debug release \n"\
-"    -n ,--nuber        <long>      this will just print a number \n"\
-"    -h ,--help         <bool>      Shows help menu \n"\
-"    -v ,--version      <bool>      Shows version string \n"\
+"    -d, --debug       <bool>      Enable debug \n"\
+"    -T, --run-tests   <bool>      Runs tests after build. \n"\
+"    -t, --build-tests <bool>      Build tests. \n"\
+"    -I, --install     <bool>      Installs in /usr/bin \n"\
+"    -h, --help        <bool>      Shows help menu \n"\
+"    -v, --version     <bool>      Shows version string \n"\
 ""
 
 #define SCLIP_VERSION_STR "project-build 0.0.1\n"
 
 typedef enum {
+    SCLIP_OPTION_DEBUG_ID,
+    SCLIP_OPTION_RUN_TESTS_ID,
     SCLIP_OPTION_BUILD_TESTS_ID,
-    SCLIP_OPTION_ENABLE_DEBUG_ID,
-    SCLIP_OPTION_NUMBER_ID,
+    SCLIP_OPTION_INSTALL_ID,
     SCLIP_OPTION_HELP_ID,
     SCLIP_OPTION_VERSION_ID
 } sclip_option_id;
 
 static sclip_option SCLIP_OPTIONS[] = {
+    [SCLIP_OPTION_DEBUG_ID] = { .long_opt = "--debug", .short_opt = "-d", .type = SCLIP_BOOL, .optional = true, .value = { .numeric = LONG_MIN } },
+    [SCLIP_OPTION_RUN_TESTS_ID] = { .long_opt = "--run-tests", .short_opt = "-T", .type = SCLIP_BOOL, .optional = true, .value = { .numeric = LONG_MIN } },
     [SCLIP_OPTION_BUILD_TESTS_ID] = { .long_opt = "--build-tests", .short_opt = "-t", .type = SCLIP_BOOL, .optional = true, .value = { .numeric = LONG_MIN } },
-    [SCLIP_OPTION_ENABLE_DEBUG_ID] = { .long_opt = "--enable-debug", .short_opt = "-d", .type = SCLIP_BOOL, .optional = true, .value = { .numeric = LONG_MIN } },
-    [SCLIP_OPTION_NUMBER_ID] = { .long_opt = "--nuber", .short_opt = "-n", .type = SCLIP_LONG, .optional = true, .value = { .numeric = LONG_MIN } },
+    [SCLIP_OPTION_INSTALL_ID] = { .long_opt = "--install", .short_opt = "-I", .type = SCLIP_BOOL, .optional = true, .value = { .numeric = LONG_MIN } },
     [SCLIP_OPTION_HELP_ID] = { .long_opt = "--help", .short_opt = "-h", .type = SCLIP_BOOL, .optional = true, .value = { .string = SCLIP_HELP_STR } },
     [SCLIP_OPTION_VERSION_ID] = { .long_opt = "--version", .short_opt = "-v", .type = SCLIP_BOOL, .optional = true, .value = { .string = SCLIP_VERSION_STR } }
 };
 
 #define sclip_parse(argc, argv) \
     __sclip_parse(argc, argv, &SCLIP_OPTIONS[0])
-static inline void __sclip_parse(int argc, const char **argv, sclip_option *restrict options);
-static inline bool sclip_is_opt(const char *arg);
+static inline sclip_parse_ret __sclip_parse(int argc, const char **argv, sclip_option *restrict options);
+static inline void sclip_print_help();
 static inline bool sclip_opt_matches(const char *arg, sclip_option *restrict option);
 static inline sclip_value sclip_opt_parse_long(const char *arg);
 static inline sclip_value sclip_opt_parse_double(const char *arg);
@@ -76,24 +93,31 @@ static inline long sclip_opt_get_value_long(const sclip_option *restrict options
 static inline bool sclip_opt_get_value_bool(const sclip_option *restrict options, const sclip_option_id id);
 static inline const char *sclip_opt_get_value_string(const sclip_option *restrict options, const sclip_option_id id);
 static inline bool sclip_opt_is_provided(const sclip_option *restrict options, const sclip_option_id id);
+static inline bool sclip_is_stdin_available();
+static inline sclip_stdin_content sclip_get_stdin_contents();
+static inline void sclip_free_stdin_content(sclip_stdin_content *restrict const content);
 
 #ifdef __cplusplus
 }// extern "C"
 #endif
 
+#define sclip_opt_debug_is_provided() \
+    sclip_opt_is_provided(&SCLIP_OPTIONS[0], SCLIP_OPTION_DEBUG_ID)
+#define sclip_opt_run_tests_is_provided() \
+    sclip_opt_is_provided(&SCLIP_OPTIONS[0], SCLIP_OPTION_RUN_TESTS_ID)
 #define sclip_opt_build_tests_is_provided() \
     sclip_opt_is_provided(&SCLIP_OPTIONS[0], SCLIP_OPTION_BUILD_TESTS_ID)
-#define sclip_opt_enable_debug_is_provided() \
-    sclip_opt_is_provided(&SCLIP_OPTIONS[0], SCLIP_OPTION_ENABLE_DEBUG_ID)
-#define sclip_opt_number_is_provided() \
-    sclip_opt_is_provided(&SCLIP_OPTIONS[0], SCLIP_OPTION_NUMBER_ID)
+#define sclip_opt_install_is_provided() \
+    sclip_opt_is_provided(&SCLIP_OPTIONS[0], SCLIP_OPTION_INSTALL_ID)
 
+#define sclip_opt_debug_get_value() \
+    sclip_opt_get_value_bool(&SCLIP_OPTIONS[0], SCLIP_OPTION_DEBUG_ID)
+#define sclip_opt_run_tests_get_value() \
+    sclip_opt_get_value_bool(&SCLIP_OPTIONS[0], SCLIP_OPTION_RUN_TESTS_ID)
 #define sclip_opt_build_tests_get_value() \
     sclip_opt_get_value_bool(&SCLIP_OPTIONS[0], SCLIP_OPTION_BUILD_TESTS_ID)
-#define sclip_opt_enable_debug_get_value() \
-    sclip_opt_get_value_bool(&SCLIP_OPTIONS[0], SCLIP_OPTION_ENABLE_DEBUG_ID)
-#define sclip_opt_number_get_value() \
-    sclip_opt_get_value_long(&SCLIP_OPTIONS[0], SCLIP_OPTION_NUMBER_ID)
+#define sclip_opt_install_get_value() \
+    sclip_opt_get_value_bool(&SCLIP_OPTIONS[0], SCLIP_OPTION_INSTALL_ID)
 
 #ifdef SCLIP_IMPL
 
@@ -128,20 +152,10 @@ static inline bool sclip_opt_is_provided(const sclip_option *restrict options, c
     return options[id].value.numeric != LONG_MIN;
 }
 
-static inline bool sclip_is_opt(const char *arg)
-{
-    if (arg == NULL || strlen(arg) < 2)
-        return false;
-    else if (arg[0] == '-' && arg[1] == '-')
-        return true;
-    else if (arg[0] == '-' && arg[1] != '-')
-        return true;
-    return false;
-}
-
 static inline bool sclip_opt_matches(const char *arg, sclip_option *restrict option)
 {
     assert(arg != NULL);
+    if (arg[0] != '-') return false;
     if (option->short_opt != NULL && strcmp(arg, option->short_opt) == 0)
         return true;
     else if (option->long_opt != NULL && strcmp(arg, option->long_opt) == 0)
@@ -168,11 +182,13 @@ static inline sclip_value sclip_opt_parse_double(const char *arg)
     return (sclip_value){ .real = ret };
 }
 
-static inline void __sclip_parse(int argc, const char **argv, sclip_option *restrict options)
+static inline sclip_parse_ret  __sclip_parse(int argc, const char **argv, sclip_option *restrict options)
 {
-    for (register int j = 0; j <= SCLIP_OPTION_VERSION_ID; j++) {
+    if(argc == 1) {
+        return SCLIP_PARSE_NO_ARGS;
+    }
+    for (register int j = SCLIP_OPTION_VERSION_ID; j >= 0; j--) {
         for (register int i = 1; i < argc; i++) {
-            if (!sclip_is_opt(argv[i])) continue;
             if (!sclip_opt_matches(argv[i], &options[j])) continue;
             switch (options[j].type) {
             case SCLIP_STRING: {
@@ -186,8 +202,8 @@ static inline void __sclip_parse(int argc, const char **argv, sclip_option *rest
             } break;
             case SCLIP_BOOL: {
                 if (j == SCLIP_OPTION_VERSION_ID || j == SCLIP_OPTION_HELP_ID) {
-                   puts(options[j].value.string);
-                   exit(EXIT_SUCCESS);
+                   fputs(options[j].value.string, stdout);
+                   return SCLIP_PARSE_VERS_OR_HELP;
                 }
                 options[j].value = (sclip_value){ .numeric = 1 };
             } break;
@@ -198,9 +214,51 @@ static inline void __sclip_parse(int argc, const char **argv, sclip_option *rest
         }
         if (!options[j].optional && options[j].value.numeric == LONG_MIN) {
             fprintf(stderr, "Mandatory option/value %s, %s was not provided\nRefer to --help, -h\n", options[j].long_opt, options[j].short_opt);
-            exit(EXIT_FAILURE);
+            return SCLIP_PARSE_MANDATORY_ARG_NOT_PROVIDED;
         }
     }
+    return SCLIP_PARSE_ALL_OK;
+}
+
+static inline void sclip_print_help()
+{
+    fputs(SCLIP_HELP_STR, stdout);
+}
+
+static inline bool sclip_is_stdin_available()
+{
+    return !isatty(STDIN_FILENO);
+}
+
+static inline sclip_stdin_content sclip_get_stdin_contents()
+{
+    static const size_t default_size = 4096;
+    char *data = NULL;
+    char buffer[default_size];
+    size_t maximum_size = default_size;
+    size_t total_bytes_read = 0;
+    size_t bytes_read = 0;
+
+    if ((data = malloc(default_size)) == NULL) {
+        return (sclip_stdin_content){ .data = NULL, .lenght = 0 };
+    }
+
+    while ((bytes_read = fread(buffer, 1, default_size, stdin)) > 0) {
+        if ((total_bytes_read + bytes_read) > maximum_size) {
+            maximum_size = 2 * maximum_size;
+            if ((data = realloc(data, maximum_size)) == NULL) {
+                return (sclip_stdin_content){ .data = NULL, .lenght = 0 };
+            }
+        }
+        memcpy(data + total_bytes_read, buffer, bytes_read);
+        total_bytes_read += bytes_read;
+    }
+    return (sclip_stdin_content){ .data = data, .lenght = total_bytes_read };
+}
+
+static inline void sclip_free_stdin_content(sclip_stdin_content *restrict const content)
+{
+    free((void *)content->data);
 }
 
 #ifdef __cplusplus
