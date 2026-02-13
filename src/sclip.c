@@ -6,7 +6,9 @@
 
 int main(int argc, const char **argv)
 {
-    sclip_parse(argc, argv);
+    if (sclip_parse(argc, argv) == SCLIP_PARSE_VERS_OR_HELP) {
+        return 0;
+    }
     FILE *output_file = NULL;
     if (sclip_opt_output_is_provided()) {
         output_file = fopen(sclip_opt_output_get_value(), "w");
